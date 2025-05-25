@@ -58,6 +58,63 @@ class HomeScreen extends StatelessWidget {
               },
               child: const Text('로그아웃'),
             ),
+            ElevatedButton(
+              onPressed: () async {
+                // 내 매장 store_id로 테스트 (예시)
+                const myStoreId = '7cc4ce9a-0925-4a66-8bd4-16b60a2c3114';
+                final user = Supabase.instance.client.auth.currentUser;
+
+                try {
+                  final response =
+                      await Supabase.instance.client.from('orders').insert({
+                    'total': 1000,
+                    'payment_method': 'cash',
+                    'status': 'paid',
+                    'store_id': myStoreId,
+                    'cashier_id': user?.id,
+                  });
+                  print('내 매장 insert 결과: $response');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('내 매장 insert 결과: $response')),
+                  );
+                } catch (e) {
+                  print('에러: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('에러: $e')),
+                  );
+                }
+              },
+              child: const Text('내 매장 주문 insert 테스트'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // 남의 매장 store_id로 테스트 (예시)
+                const otherStoreId =
+                    'b7e1c2d0-1234-4a5b-8cde-abcdef123456'; // 실제 남의 매장 store_id로 교체
+                final user = Supabase.instance.client.auth.currentUser;
+
+                try {
+                  final response =
+                      await Supabase.instance.client.from('orders').insert({
+                    'total': 1000,
+                    'payment_method': 'cash',
+                    'status': 'paid',
+                    'store_id': otherStoreId,
+                    'cashier_id': user?.id,
+                  });
+                  print('남의 매장 insert 결과: $response');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('남의 매장 insert 결과: $response')),
+                  );
+                } catch (e) {
+                  print('에러: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('에러: $e')),
+                  );
+                }
+              },
+              child: const Text('남의 매장 주문 insert 테스트'),
+            ),
           ],
         ),
       ),

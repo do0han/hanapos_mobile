@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/product.dart';
+import '../services/supabase_service.dart';
 
 Future<String?> fetchStoreIdForCurrentUser() async {
   final user = Supabase.instance.client.auth.currentUser;
@@ -33,7 +35,11 @@ Future<void> signUpAndAssignStore(
 }
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  final String storeId;
+  final Product? product;
+  final String jwtToken;
+  const AddProductScreen(
+      {super.key, required this.storeId, this.product, required this.jwtToken});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -43,26 +49,30 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final nameController = TextEditingController();
   final priceController = TextEditingController();
   final categoryController = TextEditingController();
-  String? storeId;
 
   @override
   void initState() {
     super.initState();
-    fetchStoreId();
-  }
-
-  Future<void> fetchStoreId() async {
-    storeId = await fetchStoreIdForCurrentUser();
-    print('가져온 storeId: $storeId');
-    setState(() {});
+    if (widget.product != null) {
+      nameController.text = widget.product!.name;
+      priceController.text = widget.product!.price.toString();
+      // category 필드가 있으면 세팅, 없으면 무시
+      try {
+        final cat = (widget.product as dynamic).category;
+        if (cat != null) {
+          categoryController.text = cat;
+        }
+      } catch (_) {}
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.product != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('상품 추가')),
+      appBar: AppBar(title: Text(isEdit ? '상품 수정' : '상품 추가')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             TextField(
@@ -80,46 +90,37 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: storeId == null
-                  ? null
-                  : () async {
-                      if (nameController.text.isEmpty ||
-                          priceController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('모든 필드를 입력하세요!')),
-                        );
-                        return;
-                      }
-                      try {
-                        await Supabase.instance.client.from('products').insert({
-                          'name': nameController.text,
-                          'price': int.parse(priceController.text),
-                          'category': categoryController.text,
-                          'store_id': storeId,
-                        });
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('상품 추가 성공!')),
-                        );
-                      } catch (e) {
-                        print('상품 추가 실패: $e');
-                        if (!mounted) return;
-                        showDialog(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('에러'),
-                            content: Text('상품 추가 실패: $e'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('확인'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                    },
-              child: const Text('상품 추가'),
+              onPressed: () async {
+                final name = nameController.text.trim();
+                final price = int.tryParse(priceController.text.trim()) ?? 0;
+                final category = categoryController.text.trim();
+                if (name.isEmpty || price <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('상품명/가격을 입력하세요')),
+                  );
+                  return;
+                }
+                if (isEdit) {
+                  // REST API로 수정
+                  await SupabaseService.updateProductRest(
+                    token: widget.jwtToken,
+                    id: int.parse(widget.product!.id.toString()),
+                    name: name,
+                    price: price,
+                    category: category.isNotEmpty ? category : null,
+                  );
+                } else {
+                  // REST API로 추가
+                  await SupabaseService.addProductRest(
+                    token: widget.jwtToken,
+                    name: name,
+                    price: price,
+                    category: category.isNotEmpty ? category : null,
+                  );
+                }
+                Navigator.pop(context, true);
+              },
+              child: Text(isEdit ? '수정 완료' : '상품 추가'),
             ),
           ],
         ),

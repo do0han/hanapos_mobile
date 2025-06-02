@@ -5,9 +5,13 @@ import '../../models/cart.dart';
 import '../../services/supabase_service.dart';
 import '../../screens/pos/order_history_screen.dart';
 import '../../screens/pos/inventory_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'payment_screen.dart';
+import 'receipt_screen.dart';
 
 class PosScreen extends StatefulWidget {
-  const PosScreen({super.key});
+  final String jwtToken;
+  const PosScreen({super.key, required this.jwtToken});
 
   @override
   State<PosScreen> createState() => _PosScreenState();
@@ -17,17 +21,28 @@ class _PosScreenState extends State<PosScreen> {
   List<Product> products = [];
   List<CartItem> cart = [];
   final supabaseService = SupabaseService();
-  final storeId = 'b1e2c3d4-5678-90ab-cdef-1234567890ab';
-  final cashierId = 'dda1e167-96a6-4d30-b9c5-e544b24cdf76';
+  String? storeId;
+  String? cashierId;
 
   @override
   void initState() {
     super.initState();
-    supabaseService.fetchProducts(storeId).then((list) {
-      setState(() {
-        products = list;
-      });
-    });
+    loadProfileAndProducts();
+  }
+
+  Future<void> loadProfileAndProducts() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    cashierId = user.id;
+    final profile = await Supabase.instance.client
+        .from('profiles')
+        .select('store_id')
+        .eq('id', user.id)
+        .maybeSingle();
+    storeId = profile?['store_id'] as String?;
+    if (storeId == null) return;
+    products = await SupabaseService.getProducts(storeId!);
+    setState(() {});
   }
 
   void addToCart(Product product) {
@@ -69,7 +84,14 @@ class _PosScreenState extends State<PosScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
+                MaterialPageRoute(
+                  builder: (_) => OrderHistoryScreen(
+                    role: null,
+                    jwtToken: widget.jwtToken,
+                    storeId: storeId,
+                    userId: cashierId,
+                  ),
+                ),
               );
             },
           ),
@@ -78,7 +100,12 @@ class _PosScreenState extends State<PosScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const InventoryScreen()),
+                MaterialPageRoute(
+                  builder: (_) => InventoryScreen(
+                    jwtToken: widget.jwtToken,
+                    storeId: storeId ?? '',
+                  ),
+                ),
               );
             },
           ),
@@ -87,9 +114,21 @@ class _PosScreenState extends State<PosScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ProductGrid(
-              products: products,
-              onProductTap: addToCart,
+            child: ListView.builder(
+              itemCount: products.length,
+              itemBuilder: (context, idx) {
+                final p = products[idx];
+                return ListTile(
+                  title: Text(p.name),
+                  subtitle: Text('${p.price}원'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add_shopping_cart),
+                    onPressed: () {
+                      addToCart(p);
+                    },
+                  ),
+                );
+              },
             ),
           ),
           // 장바구니 영역
@@ -135,19 +174,56 @@ class _PosScreenState extends State<PosScreen> {
                   ),
                   ElevatedButton(
                     onPressed: () async {
-                      // 결제(더미) → Supabase에 주문 저장
-                      await supabaseService.createOrder(
-                        cart,
-                        total,
-                        storeId: storeId,
-                        cashierId: cashierId,
+                      if (storeId == null || cashierId == null) return;
+                      // 결제 화면으로 이동
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PaymentScreen(total: total),
+                        ),
                       );
-                      setState(() {
-                        cart.clear();
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('주문이 완료되었습니다!')),
-                      );
+                      if (result is Map && result['success'] == true) {
+                        final paymentMethod =
+                            result['paymentMethod'] as String? ?? 'CASH';
+                        final approvalNo = result['approvalNo'] as String?;
+                        final transferNo = result['transferNo'] as String?;
+                        await supabaseService.createOrder(
+                          cart,
+                          total,
+                          storeId: storeId!,
+                          cashierId: cashierId!,
+                        );
+                        final receiptData =
+                            await supabaseService.generateReceiptData(
+                          cart: cart,
+                          total: total,
+                          storeId: storeId!,
+                          cashierId: cashierId!,
+                          transactionNo: DateTime.now().millisecondsSinceEpoch %
+                              100000, // 임시
+                          paymentMethod: paymentMethod,
+                          approvalNo: approvalNo,
+                          transferNo: transferNo,
+                        );
+                        setState(() {
+                          cart.clear();
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('주문이 완료되었습니다!')),
+                        );
+                        if (context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ReceiptScreen(data: receiptData),
+                            ),
+                          );
+                        }
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('결제가 취소되었습니다.')),
+                        );
+                      }
                     },
                     child: const Text('결제하기'),
                   ),

@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'screens/pos/pos_screen.dart';
-import 'sign_up_screen.dart';
-import 'screens/add_product_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
@@ -21,13 +18,9 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      initialRoute: Supabase.instance.client.auth.currentUser == null
-          ? '/login'
-          : '/home',
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
-      },
+      title: 'HANAPOS',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      home: const LoginScreen(),
     );
   }
 }

@@ -101,22 +101,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   return;
                 }
                 if (isEdit) {
-                  // REST API로 수정
-                  await SupabaseService.updateProductRest(
-                    token: widget.jwtToken,
-                    id: int.parse(widget.product!.id.toString()),
-                    name: name,
-                    price: price,
-                    category: category.isNotEmpty ? category : null,
-                  );
+                  // Supabase 직접 쿼리로 수정
+                  await Supabase.instance.client.from('products').update({
+                    'name': name,
+                    'price': price,
+                    if (category.isNotEmpty) 'category': category,
+                  }).eq('id', widget.product!.id);
                 } else {
-                  // REST API로 추가
-                  await SupabaseService.addProductRest(
-                    token: widget.jwtToken,
-                    name: name,
-                    price: price,
-                    category: category.isNotEmpty ? category : null,
-                  );
+                  // Supabase 직접 쿼리로 추가
+                  await Supabase.instance.client.from('products').insert({
+                    'name': name,
+                    'price': price,
+                    'store_id': widget.storeId,
+                    if (category.isNotEmpty) 'category': category,
+                  });
                 }
                 Navigator.pop(context, true);
               },

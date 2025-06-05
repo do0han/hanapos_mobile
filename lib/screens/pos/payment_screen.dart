@@ -44,44 +44,57 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('결제')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('결제 금액', style: TextStyle(fontSize: 20)),
-              const SizedBox(height: 16),
-              Text('${widget.total.toStringAsFixed(2)} ₱',
-                  style: const TextStyle(
-                      fontSize: 32, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 32),
-              DropdownButton<String>(
-                value: paymentMethod,
-                items: methods
-                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                    .toList(),
-                onChanged: (v) => setState(() => paymentMethod = v!),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(32.0),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      const Text('결제 금액', style: TextStyle(fontSize: 20)),
+                      const SizedBox(height: 16),
+                      Text('${widget.total.toStringAsFixed(2)} ₱',
+                          style: const TextStyle(
+                              fontSize: 32, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 32),
+                      DropdownButton<String>(
+                        value: paymentMethod,
+                        items: methods
+                            .map((m) =>
+                                DropdownMenuItem(value: m, child: Text(m)))
+                            .toList(),
+                        onChanged: (v) => setState(() => paymentMethod = v!),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildExtraField(),
+                      const SizedBox(height: 32),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context, {
+                          'success': true,
+                          'paymentMethod': paymentMethod,
+                          'approvalNo': approvalController.text,
+                          'transferNo': transferController.text,
+                        }),
+                        child: const Text('결제 성공'),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: () =>
+                            Navigator.pop(context, {'success': false}),
+                        child: const Text('결제 취소'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildExtraField(),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, {
-                  'success': true,
-                  'paymentMethod': paymentMethod,
-                  'approvalNo': approvalController.text,
-                  'transferNo': transferController.text,
-                }),
-                child: const Text('결제 성공'),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton(
-                onPressed: () => Navigator.pop(context, {'success': false}),
-                child: const Text('결제 취소'),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

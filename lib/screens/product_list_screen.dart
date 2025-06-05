@@ -20,11 +20,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
   @override
   void initState() {
     super.initState();
-    // REST API 방식
-    _productsFuture = SupabaseService.getProductsRest(
-      token: widget.jwtToken,
-      // search: '', limit: 20, offset: 0 등 필요시 추가
-    );
+    // Supabase 직접 접근 방식
+    _productsFuture = SupabaseService.getProducts(widget.storeId);
     // 기존 Supabase 직접 접근 방식(비권장)
     // _productsFuture = SupabaseService.getProducts(widget.storeId);
   }
@@ -38,6 +35,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            print('상품 리스트 FutureBuilder 에러: ${snapshot.error}');
+            return Center(child: Text('에러: ${snapshot.error}'));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text('상품 없음'));
@@ -68,23 +69,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           ),
                         );
                         setState(() {
-                          _productsFuture = SupabaseService.getProductsRest(
-                            token: widget.jwtToken,
-                          );
+                          _productsFuture =
+                              SupabaseService.getProducts(widget.storeId);
                         });
                       },
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete),
                       onPressed: () async {
-                        await SupabaseService.deleteProductRest(
-                          token: widget.jwtToken,
-                          id: int.parse(p.id.toString()),
-                        );
+                        await Supabase.instance.client
+                            .from('products')
+                            .delete()
+                            .eq('id', p.id);
                         setState(() {
-                          _productsFuture = SupabaseService.getProductsRest(
-                            token: widget.jwtToken,
-                          );
+                          _productsFuture =
+                              SupabaseService.getProducts(widget.storeId);
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('상품 삭제 완료!')),
@@ -109,9 +108,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           );
           if (result == true) {
             setState(() {
-              _productsFuture = SupabaseService.getProductsRest(
-                token: widget.jwtToken,
-              );
+              _productsFuture = SupabaseService.getProducts(widget.storeId);
             });
           }
         },

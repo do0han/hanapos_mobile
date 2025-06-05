@@ -15,25 +15,12 @@ class SupabaseService {
     return (res as List).map((e) => Product.fromJson(e)).toList();
   }
 
-  // REST API(Next.js)로 상품 목록 불러오기
-  static Future<List<Product>> getProductsRest({
-    required String token,
-    String? search,
-    int limit = 20,
-    int offset = 0,
-  }) async {
-    final dio = Dio();
-    const url = 'https://your-backend-domain/api/products'; // 실제 배포 주소로 교체
-    final params = {
-      'limit': limit.toString(),
-      'offset': offset.toString(),
-      if (search != null && search.isNotEmpty) 'search': search,
-    };
-    final res = await dio.get(url,
-        queryParameters: params,
-        options: Options(headers: {'Authorization': 'Bearer $token'}));
-    final data = res.data['data'] as List;
-    return data.map((e) => Product.fromJson(e)).toList();
+  static Future<List<Product>> getProducts(String storeId) async {
+    final res = await Supabase.instance.client
+        .from('products')
+        .select()
+        .eq('store_id', storeId);
+    return (res as List).map((e) => Product.fromJson(e)).toList();
   }
 
   Future<void> createOrder(List<CartItem> cart, double total,
@@ -123,14 +110,6 @@ class SupabaseService {
     });
   }
 
-  static Future<List<Product>> getProducts(String storeId) async {
-    final res = await Supabase.instance.client
-        .from('products')
-        .select()
-        .eq('store_id', storeId);
-    return (res as List).map((e) => Product.fromJson(e)).toList();
-  }
-
   // 주문 취소(환불) - order_items, orders 삭제 (트리거로 재고 복구)
   Future<void> cancelOrder(String orderId) async {
     await supabase.from('order_items').delete().eq('order_id', orderId);
@@ -201,7 +180,7 @@ class SupabaseService {
     String? category,
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/products';
+    const url = 'https://hanapos.yourdomain.com/api/products';
     final body = {
       'name': name,
       'price': price,
@@ -221,7 +200,7 @@ class SupabaseService {
     String? category,
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/products';
+    const url = 'https://hanapos.yourdomain.com/api/products';
     final body = {
       'id': id,
       'name': name,
@@ -239,7 +218,7 @@ class SupabaseService {
     required int id,
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/products';
+    const url = 'https://hanapos.yourdomain.com/api/products';
     await dio.delete(url,
         data: {'id': id},
         options: Options(headers: {'Authorization': 'Bearer $token'}));
@@ -254,7 +233,7 @@ class SupabaseService {
     required int total,
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/orders'; // 실제 배포 주소로 교체
+    const url = 'https://hanapos.yourdomain.com/api/orders'; // 실제 배포 주소로 교체
     await dio.post(
       url,
       data: {
@@ -275,7 +254,7 @@ class SupabaseService {
     String? role, // 'owner', 'manager', 'cashier'
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/orders';
+    const url = 'https://hanapos.yourdomain.com/api/orders';
     final params = {
       if (storeId != null) 'storeId': storeId,
       if (cashierId != null) 'cashierId': cashierId,
@@ -294,7 +273,7 @@ class SupabaseService {
     required String orderId,
   }) async {
     final dio = Dio();
-    final url = 'https://your-backend-domain/api/orders/$orderId/cancel';
+    final url = 'https://hanapos.yourdomain.com/api/orders/$orderId/cancel';
     await dio.post(
       url,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
@@ -307,7 +286,7 @@ class SupabaseService {
     required String storeId,
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/inventory';
+    const url = 'https://hanapos.yourdomain.com/api/inventory';
     final res = await dio.get(url,
         queryParameters: {'storeId': storeId},
         options: Options(headers: {'Authorization': 'Bearer $token'}));
@@ -324,7 +303,7 @@ class SupabaseService {
     required String reason,
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/inventory/adjust';
+    const url = 'https://hanapos.yourdomain.com/api/inventory/adjust';
     await dio.post(url,
         data: {
           'storeId': storeId,
@@ -342,7 +321,7 @@ class SupabaseService {
     required String productId,
   }) async {
     final dio = Dio();
-    const url = 'https://your-backend-domain/api/inventory/history';
+    const url = 'https://hanapos.yourdomain.com/api/inventory/history';
     final res = await dio.get(url,
         queryParameters: {'storeId': storeId, 'productId': productId},
         options: Options(headers: {'Authorization': 'Bearer $token'}));
@@ -356,7 +335,7 @@ class SupabaseService {
     required String storeId,
   }) async {
     final dio = Dio();
-    final url = 'https://your-backend-domain/api/stores/$storeId';
+    final url = 'https://hanapos.yourdomain.com/api/stores/$storeId';
     final res = await dio.get(url,
         options: Options(headers: {'Authorization': 'Bearer $token'}));
     return res.data['data'] as Map<String, dynamic>;
@@ -369,7 +348,7 @@ class SupabaseService {
     required Map<String, dynamic> update,
   }) async {
     final dio = Dio();
-    final url = 'https://your-backend-domain/api/stores/$storeId';
+    final url = 'https://hanapos.yourdomain.com/api/stores/$storeId';
     await dio.patch(url,
         data: update,
         options: Options(headers: {'Authorization': 'Bearer $token'}));
@@ -381,7 +360,7 @@ class SupabaseService {
     required String storeId,
   }) async {
     final dio = Dio();
-    final url = 'https://your-backend-domain/api/stores/$storeId/members';
+    final url = 'https://hanapos.yourdomain.com/api/stores/$storeId/members';
     final res = await dio.get(url,
         options: Options(headers: {'Authorization': 'Bearer $token'}));
     return List<Map<String, dynamic>>.from(res.data['data']);
@@ -395,7 +374,7 @@ class SupabaseService {
     required String role, // 'manager', 'cashier'
   }) async {
     final dio = Dio();
-    final url = 'https://your-backend-domain/api/stores/$storeId/invite';
+    final url = 'https://hanapos.yourdomain.com/api/stores/$storeId/invite';
     await dio.post(url,
         data: {'email': email, 'role': role},
         options: Options(headers: {'Authorization': 'Bearer $token'}));
@@ -410,7 +389,7 @@ class SupabaseService {
   }) async {
     final dio = Dio();
     final url =
-        'https://your-backend-domain/api/stores/$storeId/members/$memberId/role';
+        'https://hanapos.yourdomain.com/api/stores/$storeId/members/$memberId/role';
     await dio.patch(url,
         data: {'role': role},
         options: Options(headers: {'Authorization': 'Bearer $token'}));
@@ -424,7 +403,7 @@ class SupabaseService {
   }) async {
     final dio = Dio();
     final url =
-        'https://your-backend-domain/api/stores/$storeId/members/$memberId';
+        'https://hanapos.yourdomain.com/api/stores/$storeId/members/$memberId';
     await dio.delete(url,
         options: Options(headers: {'Authorization': 'Bearer $token'}));
   }

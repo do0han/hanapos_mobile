@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => HomeScreen(role: role, jwtToken: jwt),
+            builder: (context) => HomeScreen(jwtToken: jwt!),
           ),
         );
       } else {
@@ -170,6 +170,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> signInWithGitHub() async {
+    final supabase = Supabase.instance.client;
+    final response = await supabase.auth.signInWithOAuth(OAuthProvider.github);
+    // 로그인 완료 후 access_token 추출
+    final session = supabase.auth.currentSession;
+    print('GitHub access_token: ${session?.accessToken}');
+    // 필요하면 HomeScreen 등으로 이동
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -265,6 +274,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
                 child: const Text('비밀번호 찾기'),
               ),
+            ),
+            ElevatedButton(
+              onPressed: signInWithGitHub,
+              child: const Text('GitHub로 로그인'),
             ),
           ],
         ),

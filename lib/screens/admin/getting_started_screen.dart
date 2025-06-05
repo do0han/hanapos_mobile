@@ -50,15 +50,19 @@ class GettingStartedScreen extends StatelessWidget {
             ...checklist.map((item) => Card(
                   child: ListTile(
                     leading: Icon(
-                        item['done']!
+                        (item['done'] == true)
                             ? Icons.check_circle
                             : Icons.radio_button_unchecked,
-                        color: item['done']! ? Colors.green : Colors.grey),
+                        color: (item['done'] == true)
+                            ? Colors.green
+                            : Colors.grey),
                     title: Text(item['title'] as String),
                     subtitle: Text(item['desc'] as String),
                     trailing: ElevatedButton(
-                      onPressed: item['action'] as void Function(),
-                      child: Text(item['done']! ? '완료' : '바로가기'),
+                      onPressed: item['action'] is VoidCallback
+                          ? item['action'] as VoidCallback
+                          : null,
+                      child: Text((item['done'] == true) ? '완료' : '바로가기'),
                     ),
                   ),
                 )),

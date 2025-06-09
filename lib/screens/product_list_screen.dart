@@ -1,116 +1,180 @@
 import 'package:flutter/material.dart';
-import '../services/supabase_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/product_provider.dart';
 import '../models/product.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_product_screen.dart';
+import 'product_detail_screen.dart';
 
-class ProductListScreen extends StatefulWidget {
+class ProductListScreen extends ConsumerStatefulWidget {
   final String storeId;
   final String jwtToken;
   const ProductListScreen(
-      {required this.storeId, required this.jwtToken, super.key});
+      {super.key, required this.storeId, required this.jwtToken});
 
   @override
-  State<ProductListScreen> createState() => _ProductListScreenState();
+  ConsumerState<ProductListScreen> createState() => _ProductListScreenState();
 }
 
-class _ProductListScreenState extends State<ProductListScreen> {
-  late Future<List<Product>> _productsFuture;
+class _ProductListScreenState extends ConsumerState<ProductListScreen> {
+  String _search = '';
+  final _searchController = TextEditingController();
+  String? _selectedCategory;
+  String _sort = '이름순';
 
   @override
   void initState() {
     super.initState();
-    // Supabase 직접 접근 방식
-    _productsFuture = SupabaseService.getProducts(widget.storeId);
-    // 기존 Supabase 직접 접근 방식(비권장)
-    // _productsFuture = SupabaseService.getProducts(widget.storeId);
+    Future.microtask(() => ref.read(productProvider.notifier).fetchProducts());
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(productProvider);
+    final notifier = ref.read(productProvider.notifier);
+    final products = state.products
+        .where((p) => _search.isEmpty || p.name.contains(_search))
+        .where((p) =>
+            _selectedCategory == null || p.categoryId == _selectedCategory)
+        .toList()
+      ..sort((a, b) => _sort == '이름순'
+          ? a.name.compareTo(b.name)
+          : a.price.compareTo(b.price));
+
     return Scaffold(
-      appBar: AppBar(title: const Text('상품 리스트')),
-      body: FutureBuilder<List<Product>>(
-        future: _productsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            print('상품 리스트 FutureBuilder 에러: ${snapshot.error}');
-            return Center(child: Text('에러: ${snapshot.error}'));
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('상품 없음'));
-          }
-          final products = snapshot.data!;
-          return ListView.builder(
-            itemCount: products.length,
-            itemBuilder: (context, idx) {
-              final p = products[idx];
-              return ListTile(
-                title: Text(p.name),
-                subtitle: Text('${p.price}원'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (p.description != null) Text(p.description!),
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AddProductScreen(
-                              storeId: widget.storeId,
-                              product: p,
-                              jwtToken: widget.jwtToken,
-                            ),
-                          ),
-                        );
-                        setState(() {
-                          _productsFuture =
-                              SupabaseService.getProducts(widget.storeId);
-                        });
-                      },
+      appBar: AppBar(
+        title: const Text('상품 리스트'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => notifier.fetchProducts(),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: '상품명 검색',
+                      prefixIcon: Icon(Icons.search),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () async {
-                        await Supabase.instance.client
-                            .from('products')
-                            .delete()
-                            .eq('id', p.id);
-                        setState(() {
-                          _productsFuture =
-                              SupabaseService.getProducts(widget.storeId);
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('상품 삭제 완료!')),
-                        );
-                      },
-                    ),
-                  ],
+                    onChanged: (v) {
+                      setState(() => _search = v);
+                    },
+                  ),
                 ),
-              );
-            },
-          );
-        },
+                const SizedBox(width: 8),
+                DropdownButton<String>(
+                  value: _sort,
+                  items: const [
+                    DropdownMenuItem(value: '이름순', child: Text('이름순')),
+                    DropdownMenuItem(value: '가격순', child: Text('가격순')),
+                  ],
+                  onChanged: (v) => setState(() => _sort = v!),
+                ),
+              ],
+            ),
+          ),
+          if (state.isLoading)
+            const Expanded(child: Center(child: CircularProgressIndicator())),
+          if (state.error != null)
+            Expanded(child: Center(child: Text('에러: ${state.error}'))),
+          if (!state.isLoading && state.error == null)
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () => notifier.fetchProducts(),
+                child: products.isEmpty
+                    ? const Center(child: Text('상품 없음'))
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isTablet = constraints.maxWidth > 600;
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(8),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: isTablet ? 3 : 1,
+                              childAspectRatio: isTablet ? 1.8 : 3.5,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                            ),
+                            itemCount: products.length,
+                            itemBuilder: (context, idx) {
+                              final p = products[idx];
+                              return Card(
+                                child: ListTile(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => ProductDetailScreen(
+                                          product: p,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  title: Text(p.name),
+                                  subtitle: Text('${p.price}원'),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (p.description != null)
+                                        Text(p.description!),
+                                      IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        onPressed: () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => AddProductScreen(
+                                                storeId: widget.storeId,
+                                                product: p,
+                                                jwtToken: widget.jwtToken,
+                                              ),
+                                            ),
+                                          );
+                                          notifier.fetchProducts();
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete),
+                                        onPressed: () async {
+                                          await notifier.deleteProduct(p.id);
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                                content: Text('상품 삭제 완료!')),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => AddProductScreen(
-                  storeId: widget.storeId, jwtToken: widget.jwtToken),
+                storeId: widget.storeId,
+                jwtToken: widget.jwtToken,
+              ),
             ),
           );
-          if (result == true) {
-            setState(() {
-              _productsFuture = SupabaseService.getProducts(widget.storeId);
-            });
-          }
+          notifier.fetchProducts();
         },
         child: const Icon(Icons.add),
       ),

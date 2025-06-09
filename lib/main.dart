@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'models/product.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  Hive.registerAdapter(ProductAdapter());
   await Supabase.initialize(
     url: 'https://fjyuajkqcetfpglbfxsx.supabase.co',
     anonKey:
